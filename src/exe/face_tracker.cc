@@ -39,6 +39,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 #include <FaceTracker/Tracker.h>
 #include <opencv/highgui.h>
+#include <opencv2/imgcodecs.hpp>
 #include <iostream>
 //=============================================================================
 void Draw(cv::Mat &image,cv::Mat &shape,cv::Mat &con,cv::Mat &tri,cv::Mat &visi)
@@ -86,6 +87,111 @@ void Draw(cv::Mat &image,cv::Mat &shape,cv::Mat &con,cv::Mat &tri,cv::Mat &visi)
   }return;
 }
 //=============================================================================
+//http://jepsonsblog.blogspot.com/2012/10/overlay-transparent-image-in-opencv.html
+void overlayImage(const cv::Mat &background, const cv::Mat &frgnd,
+                  //                  cv::Mat &output,
+                  cv::Point2i location, double scale)
+{
+    //    background.copyTo(output);
+    cv::Mat foreground;
+    cv::resize(frgnd, foreground, cv::Size(scale*frgnd.cols,scale*frgnd.rows));
+    
+    // start at the row indicated by location, or at row 0 if location.y is negative.
+    for(int y = std::max(location.y , 0); y < background.rows; ++y)
+    {
+        int fY = y - location.y; // because of the translation
+        
+        // we are done of we have processed all rows of the foreground image.
+        if(fY >= foreground.rows)
+            break;
+        
+        // start at the column indicated by location,
+        
+        // or at column 0 if location.x is negative.
+        for(int x = std::max(location.x, 0); x < background.cols; ++x)
+        {
+            int fX = x - location.x; // because of the translation.
+            
+            // we are done with this row if the column is outside of the foreground image.
+            if(fX >= foreground.cols)
+                break;
+            
+            // determine the opacity of the foregrond pixel, using its fourth (alpha) channel.
+            double opacity =
+            ((double)foreground.data[fY * foreground.step + fX * foreground.channels() + 3])
+            
+            / 255.;
+            
+            
+            // and now combine the background and foreground pixel, using the opacity,
+            
+            // but only if opacity > 0.
+            for(int c = 0; opacity > 0 && c < background.channels(); ++c)
+            {
+                unsigned char foregroundPx =
+                foreground.data[fY * foreground.step + fX * foreground.channels() + c];
+                unsigned char backgroundPx =
+                background.data[y * background.step + x * background.channels() + c];
+                background.data[y*background.step + background.channels()*x + c] =
+                backgroundPx * (1.-opacity) + foregroundPx * opacity;
+            }
+        }
+    }
+}
+//=============================================================================
+void Draw(cv::Mat &image,cv::Mat &shape,cv::Mat &visi,cv::Mat &overlay)
+{
+  int i,n = shape.rows/2; cv::Point p1,p2; cv::Scalar c;
+  char sss[256]; std::string text;
+    double x0,x16; double scale;
+//0
+//1
+//15
+//16
+  if(visi.at<int>(0,0) != 0){
+//    p2=cv::Point(shape.at<double>(16,0),shape.at<double>(16 + n,0));
+    x16 = shape.at<double>(16,0);
+    x0 = shape.at<double>(0,0);
+    scale = (x16 - x0)/752.0;
+    p2=cv::Point(x0,shape.at<double>(36+n,0)-(207*scale));
+    overlayImage(image, overlay, p2, scale);
+  }
+  //draw numbers
+//  for(i = 0; i < n; i++){
+//    if(visi.at<int>(i,0) == 0)continue;
+//    p1 = cv::Point(shape.at<double>(i,0),shape.at<double>(i+n,0));
+//    if (i==0 || i==16){
+//        sprintf(sss,"%d(%d)",(int) i, p1.x);
+//    }else{
+//        sprintf(sss,"%d",(int) i);
+//    }
+//    text = sss;
+//    c = CV_RGB(255,0,0); //cv::circle(image,p1,2,c);
+//    cv::putText(image,text,p1, CV_FONT_HERSHEY_SIMPLEX,0.5,c);
+//  }
+  return;
+}
+//Background removing
+//https://docs.opencv.org/3.3.0/db/d5c/tutorial_py_bg_subtraction.html
+//=============================================================================
+//https://stackoverflow.com/questions/20957433/how-to-draw-a-transparent-image-over-live-camera-feed-in-opencv
+//cv::Mat display_img( src.size(), src.type() ){
+//    for (int y = 0; y < src.rows; y++)
+//    {
+//        const cv::Vec3b* src_pixel = src.ptr<cv::Vec3b>(y);
+//        const cv::Vec4b* ovl_pixel = overlay.ptr<cv::Vec4b>(y);
+//        cv::Vec3b* dst_pixel = display_img.ptr<cv::Vec3b>(y);
+//        for (int x = 0; x < src.cols; x++, ++src_pixel, ++ovl_pixel, ++dst_pixel)
+//        {
+//            double alpha = (*ovl_pixel).val[3] / 255.0;
+//            for (int c = 0; c < 3; c++)
+//            {
+//                (*dst_pixel).val[c] = (uchar) ((*ovl_pixel).val[c] * alpha + (*src_pixel).val[c] * (1.0 -alpha));
+//            }
+//        }
+//    }
+//}
+//=============================================================================
 int parse_cmd(int argc, const char** argv,
 	      char* ftFile,char* conFile,char* triFile,
 	      bool &fcheck,double &scale,int &fpd)
@@ -100,11 +206,11 @@ int parse_cmd(int argc, const char** argv,
 	   << "# usage: ./face_tracker [options]" << std::endl
 	   << "#" << std::endl << std::endl
 	   << "Arguments:" << std::endl
-	   << "-m <string> -> Tracker model (default: ../model/face2.tracker)"
+	   << "-m <string> -> Tracker model (default: model/face2.tracker)"
 	   << std::endl
-	   << "-c <string> -> Connectivity (default: ../model/face.con)"
+	   << "-c <string> -> Connectivity (default: model/face.con)"
 	   << std::endl
-	   << "-t <string> -> Triangulation (default: ../model/face.tri)"
+	   << "-t <string> -> Triangulation (default: model/face.tri)"
 	   << std::endl
 	   << "-s <double> -> Image scaling (default: 1)" << std::endl
 	   << "-d <int>    -> Frames/detections (default: -1)" << std::endl
@@ -133,27 +239,27 @@ int parse_cmd(int argc, const char** argv,
   for(i = 1; i < argc; i++){
     if(std::strcmp(argv[i],"-m") == 0){
       if(argc > i+1)std::strcpy(ftFile,argv[i+1]);
-      else strcpy(ftFile,"../model/face2.tracker");
+      else strcpy(ftFile,"model/face2.tracker");
       break;
     }
   }
-  if(i >= argc)std::strcpy(ftFile,"../model/face2.tracker");
+  if(i >= argc)std::strcpy(ftFile,"model/face2.tracker");
   for(i = 1; i < argc; i++){
     if(std::strcmp(argv[i],"-c") == 0){
       if(argc > i+1)std::strcpy(conFile,argv[i+1]);
-      else strcpy(conFile,"../model/face.con");
+      else strcpy(conFile,"model/face.con");
       break;
     }
   }
-  if(i >= argc)std::strcpy(conFile,"../model/face.con");
+  if(i >= argc)std::strcpy(conFile,"model/face.con");
   for(i = 1; i < argc; i++){
     if(std::strcmp(argv[i],"-t") == 0){
       if(argc > i+1)std::strcpy(triFile,argv[i+1]);
-      else strcpy(triFile,"../model/face.tri");
+      else strcpy(triFile,"model/face.tri");
       break;
     }
   }
-  if(i >= argc)std::strcpy(triFile,"../model/face.tri");
+  if(i >= argc)std::strcpy(triFile,"model/face.tri");
   return 0;
 }
 //=============================================================================
@@ -173,7 +279,11 @@ int main(int argc, const char** argv)
   cv::Mat con=FACETRACKER::IO::LoadCon(conFile);
   
   //initialize camera and display window
-  cv::Mat frame,gray,im; double fps=0; char sss[256]; std::string text; 
+  cv::Mat frame,gray,im; double fps=0; char sss[256]; std::string text;
+
+  //https://stackoverflow.com/questions/34497099/opencv-undefined-reference-to-imread
+  model._googles = cv::imread("res/eyes.png" , cv::IMREAD_UNCHANGED);
+
   cv::VideoCapture camera(CV_CAP_ANY); if(!camera.isOpened()) return -1;
   int64 t1,t0 = cvGetTickCount(); int fnum=0;
   cvNamedWindow("Face Tracker",1);
@@ -194,7 +304,7 @@ int main(int argc, const char** argv)
     std::vector<int> wSize; if(failed)wSize = wSize2; else wSize = wSize1; 
     if(model.Track(gray,wSize,fpd,nIter,clamp,fTol,fcheck) == 0){
       int idx = model._clm.GetViewIdx(); failed = false;
-      Draw(im,model._shape,con,tri,model._clm._visi[idx]); 
+      Draw(im,model._shape,model._clm._visi[idx], model._googles);
     }else{
       if(show){cv::Mat R(im,cvRect(0,0,150,50)); R = cv::Scalar(0,0,255);}
       model.FrameReset(); failed = true;
@@ -212,7 +322,7 @@ int main(int argc, const char** argv)
     }
     //show image and check for user input
     imshow("Face Tracker",im); 
-    int c = cvWaitKey(10);
+    int c = cvWaitKey(5);
     if(c == 27)break; else if(char(c) == 'd')model.FrameReset();
   }return 0;
 }

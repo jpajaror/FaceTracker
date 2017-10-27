@@ -56,6 +56,7 @@ namespace FACETRACKER
     MFCheck    _fcheck; /**< Failure checker                   */
     cv::Mat    _shape;  /**< Current shape                     */
     cv::Mat    _rshape; /**< Reference shape                   */
+    cv::Mat    _googles;/**< Googles PNG                       */
     cv::Rect   _rect;   /**< Detected rectangle                */
     cv::Scalar _simil;  /**< Initialization similarity         */
     
